@@ -1,0 +1,7 @@
+query IndexedBlockNumber {
+    _meta {
+        block {
+            number
+        }
+    }
+}
