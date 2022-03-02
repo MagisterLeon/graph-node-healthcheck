@@ -3,44 +3,52 @@
 #[macro_use]
 extern crate rocket;
 
-use rocket_contrib::json::Json;
-use serde::Serialize;
+use std::sync::atomic::{AtomicIsize};
+use healthcheck::get_not_indexed_block_count;
+use api::{Api, BlockApi};
+use routes::Block;
+use time::current_time_as_secs;
 
-use node::get_block_number;
+mod routes;
+mod healthcheck;
+mod time;
+mod api;
 
-use crate::graph::get_indexed_block_number;
-
-mod node;
-mod graph;
-
-#[derive(Serialize)]
-struct Block {
-    number: u64,
+pub struct Config {
+    api: BlockApi,
 }
 
-#[get("/")]
-fn get_not_indexed_blocks() -> Json<Block> {
-    let indexed_block = match get_indexed_block_number() {
-        Ok(res) => res,
-        Err(error) => panic!("Getting indexed block numer failed: {:?}", error),
-    };
+pub struct HealthcheckState {
+    not_indexed_blocks_count: AtomicIsize,
+    time: AtomicIsize,
+}
 
-    let latest_block = match get_block_number() {
-        Ok(res) => res,
-        Err(error) => panic!("Getting latest block numer failed: {:?}", error)
-    };
-    println!("Indexed block: {:?}", &indexed_block);
-    println!("Latest block: {:?}", &latest_block);
-
-    let not_indexed_blocks = u64::try_from(latest_block - indexed_block).unwrap();
-    let response = Block {
-        number: not_indexed_blocks
-    };
-
-    Json(response)
+impl HealthcheckState {
+    pub fn new(not_indexed_blocks_count: i64, time: u64) -> Self {
+        Self {
+            not_indexed_blocks_count: AtomicIsize::new(not_indexed_blocks_count as isize),
+            time: AtomicIsize::new(time as isize),
+        }
+    }
 }
 
 fn main() {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![get_not_indexed_blocks]).launch();
+
+    let api = BlockApi {};
+
+    let not_indexed_blocks_count = get_not_indexed_block_count(&api);
+    let time = current_time_as_secs();
+
+    rocket::ignite()
+        .manage(Config {
+            api
+        })
+        .manage(HealthcheckState::new(not_indexed_blocks_count, time),
+        )
+        .mount("/", routes![
+            routes::get_not_indexed_blocks,
+            routes::healthcheck
+        ])
+        .launch();
 }

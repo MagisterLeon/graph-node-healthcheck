@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.52"
 rocket = "0.4.10"
 rocket_contrib = "0.4"
 reqwest = { version = "^0.11", features = ["json", "blocking"] }
