@@ -21,5 +21,5 @@ pub fn get_not_indexed_blocks(config: State<Config>) -> Json<Block> {
 
 #[get("/healthcheck")]
 pub fn healthcheck(config: State<Config>, healthcheck_state: State<HealthcheckState>) {
-    graph_healthcheck(&config.api, healthcheck_state);
+    graph_healthcheck(&config.api, healthcheck_state).expect("Healthcheck failed");
 }

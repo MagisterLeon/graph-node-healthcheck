@@ -1,12 +1,11 @@
 use std::error::Error;
-use std::ops::Deref;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use rocket::State;
 use web3::types::U64;
 
-use crate::{api, BlockApi, current_time_as_secs, HealthcheckState};
+use crate::{current_time_as_secs, HealthcheckState};
 use crate::api::Api;
 use async_trait::async_trait;
 
@@ -16,8 +15,12 @@ pub const HEALTHCHECK_INTERVAL: isize = 5;
 pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckState>) -> Result<(), String> {
     let last_checked_time = healthcheck_state.time.load(Ordering::Relaxed);
     let current_time = current_time_as_secs();
-
     let mut is_ok = healthcheck_state.is_ok.lock().unwrap();
+
+    println!("current state: not_indexed_blocks_count {:?}", &healthcheck_state.not_indexed_blocks_count);
+    println!("current state: time {:?}", &healthcheck_state.time);
+    println!("current state: is_ok {:?}", &is_ok);
+
     if current_time < (last_checked_time + HEALTHCHECK_INTERVAL) as u64 {
         return if *is_ok {
             Ok(())
@@ -68,7 +71,6 @@ async fn get_latest_block_number(api: &dyn Api) -> U64 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::AtomicIsize;
     use super::*;
 
     #[test]

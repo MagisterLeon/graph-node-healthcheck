@@ -5,10 +5,8 @@ extern crate rocket;
 
 use std::sync::atomic::{AtomicIsize};
 use std::sync::Mutex;
-use web3::types::Res;
 use healthcheck::get_not_indexed_block_count;
-use api::{Api, BlockApi};
-use routes::Block;
+use api::{BlockApi};
 use time::current_time_as_secs;
 
 mod routes;
