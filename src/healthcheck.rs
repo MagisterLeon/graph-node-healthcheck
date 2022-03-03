@@ -1,5 +1,7 @@
 use std::error::Error;
+use std::ops::Deref;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
 use rocket::State;
 use web3::types::U64;
@@ -15,8 +17,9 @@ pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckStat
     let last_checked_time = healthcheck_state.time.load(Ordering::Relaxed);
     let current_time = current_time_as_secs();
 
+    let mut is_ok = healthcheck_state.is_ok.lock().unwrap();
     if current_time < (last_checked_time + HEALTHCHECK_INTERVAL) as u64 {
-        return if healthcheck_state.is_ok {
+        return if *is_ok {
             Ok(())
         } else {
             Err("Blocks are not being indexed.".to_string())
@@ -30,9 +33,10 @@ pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckStat
     healthcheck_state.time.store(current_time as isize, Ordering::Relaxed);
 
     if not_indexed_blocks > 0 && current_not_indexed_blocks >= not_indexed_blocks as i64 {
+        *is_ok = false;
         return Err(format!("Blocks are not being indexed. Not indexed blocks count: {:?}", &current_not_indexed_blocks));
     }
-
+    *is_ok = true;
     return Ok(());
 }
 
@@ -71,8 +75,8 @@ mod tests {
     fn healthcheck_ok_when_blocks_indexing_increased() {
         // given
         let api = TestApi::new(2, 2);
-        let time = current_time_as_secs() - 5;
-        let healthcheck_state = HealthcheckState::new(0, time, true);
+        let time = current_time_as_secs() - HEALTHCHECK_INTERVAL as u64;
+        let healthcheck_state = HealthcheckState::new(0, time, Mutex::new(true));
         let rocket = rocket::ignite().manage(healthcheck_state);
         let state = State::from(&rocket).expect("managing `HealthcheckState`");
 
@@ -87,8 +91,8 @@ mod tests {
     fn healthcheck_err_when_num_of_not_indexed_blocks_is_equal() {
         // given
         let api = TestApi::new(0, 2);
-        let time = current_time_as_secs() - 5;
-        let healthcheck_state = HealthcheckState::new(2, time, true);
+        let time = current_time_as_secs() - HEALTHCHECK_INTERVAL as u64;
+        let healthcheck_state = HealthcheckState::new(2, time, Mutex::new(true));
         let rocket = rocket::ignite().manage(healthcheck_state);
         let state = State::from(&rocket).expect("managing `HealthcheckState`");
 
@@ -103,8 +107,40 @@ mod tests {
     fn healthcheck_err_when_num_of_not_indexed_blocks_increased() {
         // given
         let api = TestApi::new(0, 3);
-        let time = current_time_as_secs() - 5;
-        let healthcheck_state = HealthcheckState::new(2, time, true);
+        let time = current_time_as_secs() - HEALTHCHECK_INTERVAL as u64;
+        let healthcheck_state = HealthcheckState::new(2, time, Mutex::new(true));
+        let rocket = rocket::ignite().manage(healthcheck_state);
+        let state = State::from(&rocket).expect("managing `HealthcheckState`");
+
+        // when
+        let result = graph_healthcheck(&api, state);
+
+        // then
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn return_recent_ok_result_if_checked_before_healthcheck_interval() {
+        // given
+        let api = TestApi::new(0, 0);
+        let time = current_time_as_secs();
+        let healthcheck_state = HealthcheckState::new(0, time, Mutex::new(true));
+        let rocket = rocket::ignite().manage(healthcheck_state);
+        let state = State::from(&rocket).expect("managing `HealthcheckState`");
+
+        // when
+        let result = graph_healthcheck(&api, state);
+
+        // then
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn return_recent_err_result_if_checked_before_healthcheck_interval() {
+        // given
+        let api = TestApi::new(0, 0);
+        let time = current_time_as_secs();
+        let healthcheck_state = HealthcheckState::new(0, time, Mutex::new(false));
         let rocket = rocket::ignite().manage(healthcheck_state);
         let state = State::from(&rocket).expect("managing `HealthcheckState`");
 

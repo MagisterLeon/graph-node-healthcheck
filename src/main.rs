@@ -4,6 +4,7 @@
 extern crate rocket;
 
 use std::sync::atomic::{AtomicIsize};
+use std::sync::Mutex;
 use web3::types::Res;
 use healthcheck::get_not_indexed_block_count;
 use api::{Api, BlockApi};
@@ -22,11 +23,11 @@ pub struct Config {
 pub struct HealthcheckState {
     not_indexed_blocks_count: AtomicIsize,
     time: AtomicIsize,
-    is_ok: bool,
+    is_ok: Mutex<bool>,
 }
 
 impl HealthcheckState {
-    pub fn new(not_indexed_blocks_count: i64, time: u64, is_ok: bool) -> Self {
+    pub fn new(not_indexed_blocks_count: i64, time: u64, is_ok: Mutex<bool>) -> Self {
         Self {
             not_indexed_blocks_count: AtomicIsize::new(not_indexed_blocks_count as isize),
             time: AtomicIsize::new(time as isize),
@@ -47,7 +48,7 @@ fn main() {
         .manage(Config {
             api
         })
-        .manage(HealthcheckState::new(not_indexed_blocks_count, time, true),
+        .manage(HealthcheckState::new(not_indexed_blocks_count, time, Mutex::new(true)),
         )
         .mount("/", routes![
             routes::get_not_indexed_blocks,
