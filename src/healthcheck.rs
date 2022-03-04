@@ -8,65 +8,68 @@ use web3::types::U64;
 use crate::{current_time_as_secs, HealthcheckState};
 use crate::api::Api;
 use async_trait::async_trait;
+use crate::errors::HealthcheckError;
 
 
 pub const HEALTHCHECK_INTERVAL: isize = 5;
 
-pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckState>) -> Result<(), String> {
+pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckState>) -> Result<(), HealthcheckError> {
+    let not_indexed_blocks = healthcheck_state.not_indexed_blocks_count.load(Ordering::Relaxed);
     let last_checked_time = healthcheck_state.time.load(Ordering::Relaxed);
-    let current_time = current_time_as_secs();
     let mut is_ok = healthcheck_state.is_ok.lock().unwrap();
 
     println!("current state: not_indexed_blocks_count {:?}", &healthcheck_state.not_indexed_blocks_count);
     println!("current state: time {:?}", &healthcheck_state.time);
     println!("current state: is_ok {:?}", &is_ok);
 
+    let current_time = current_time_as_secs();
     if current_time < (last_checked_time + HEALTHCHECK_INTERVAL) as u64 {
         return if *is_ok {
             Ok(())
         } else {
-            Err("Blocks are not being indexed.".to_string())
+            Err(HealthcheckError::new("Blocks are not being indexed."))
         };
     }
 
-    let not_indexed_blocks = healthcheck_state.not_indexed_blocks_count.load(Ordering::Relaxed);
-    let current_not_indexed_blocks = get_not_indexed_block_count(api);
+    return match get_not_indexed_block_count(api) {
+        Ok(current_not_indexed_blocks) => {
+            healthcheck_state.not_indexed_blocks_count.store(current_not_indexed_blocks as isize, Ordering::Relaxed);
+            healthcheck_state.time.store(current_time as isize, Ordering::Relaxed);
 
-    healthcheck_state.not_indexed_blocks_count.store(current_not_indexed_blocks as isize, Ordering::Relaxed);
-    healthcheck_state.time.store(current_time as isize, Ordering::Relaxed);
-
-    if not_indexed_blocks > 0 && current_not_indexed_blocks >= not_indexed_blocks as i64 {
-        *is_ok = false;
-        return Err(format!("Blocks are not being indexed. Not indexed blocks count: {:?}", &current_not_indexed_blocks));
+            if not_indexed_blocks > 0 && current_not_indexed_blocks >= not_indexed_blocks as i64 {
+                *is_ok = false;
+                return Err(HealthcheckError::new(
+                    format!("Blocks are not being indexed. Not indexed blocks count: {:?}", &current_not_indexed_blocks).as_str())
+                );
+            }
+            *is_ok = true;
+            return Ok(())
+        },
+        Err(err) => {
+            std::mem::drop(is_ok);
+            eprintln!("Problem fetching not indexed blocks: {}", err);
+            Err(HealthcheckError::new("Cannot get not indexed blocks count"))
+        }
     }
-    *is_ok = true;
-    return Ok(());
 }
 
-pub fn get_not_indexed_block_count(api: &dyn Api) -> i64 {
-    let indexed_block = get_indexed_block_number(api);
-    let latest_block = get_latest_block_number(api);
-
-    i64::try_from(latest_block - indexed_block).unwrap()
+pub fn get_not_indexed_block_count(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let indexed_block = get_indexed_block_number(api)?;
+    let latest_block = get_latest_block_number(api)?;
+    Ok(i64::try_from(latest_block - indexed_block).unwrap())
 }
 
-fn get_indexed_block_number(api: &dyn Api) -> i64 {
-    let indexed_block = match api.get_indexed_block_num() {
-        Ok(res) => res,
-        Err(error) => panic!("Getting indexed block numer failed: {:?}", error)
-    };
+fn get_indexed_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let indexed_block = api.get_indexed_block_num()?;
     println!("Indexed block: {:?}", &indexed_block);
-    indexed_block
+    Ok(indexed_block)
 }
 
 #[tokio::main]
-async fn get_latest_block_number(api: &dyn Api) -> U64 {
-    let latest_block = match api.get_latest_block_num().await {
-        Ok(res) => res,
-        Err(error) => panic!("Getting latest block numer failed: {:?}", error)
-    };
+async fn get_latest_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let latest_block = api.get_latest_block_num().await?;
     println!("Latest block: {:?}", &latest_block);
-    latest_block
+    Ok(latest_block)
 }
 
 #[cfg(test)]
@@ -173,8 +176,8 @@ mod tests {
             Ok(self.indexed_block)
         }
 
-        async fn get_latest_block_num(&self) -> web3::Result<U64> {
-            web3::Result::Ok(U64::from(self.latest_block))
+        async fn get_latest_block_num(&self) -> Result<i64, Box<dyn Error>> {
+            Ok(self.latest_block)
         }
     }
 }

@@ -13,6 +13,7 @@ mod routes;
 mod healthcheck;
 mod time;
 mod api;
+mod errors;
 
 pub struct Config {
     api: BlockApi,
@@ -39,7 +40,8 @@ fn main() {
 
     let api = BlockApi {};
 
-    let not_indexed_blocks_count = get_not_indexed_block_count(&api);
+    let not_indexed_blocks_count = get_not_indexed_block_count(&api)
+        .expect("Getting not indexed blocks on startup");
     let time = current_time_as_secs();
 
     rocket::ignite()

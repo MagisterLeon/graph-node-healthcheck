@@ -18,7 +18,7 @@ pub struct IndexedBlockNumber;
 #[async_trait]
 pub trait Api {
     fn get_indexed_block_num(&self) -> Result<i64, Box<dyn Error>>;
-    async fn get_latest_block_num(&self) -> web3::Result<U64>;
+    async fn get_latest_block_num(&self) -> Result<i64, Box<dyn Error>>;
 }
 
 pub struct BlockApi();
@@ -36,11 +36,12 @@ impl Api for BlockApi {
         Ok(block_num)
     }
 
-    async fn get_latest_block_num(&self) -> web3::Result<U64> {
+    async fn get_latest_block_num(&self) -> Result<i64, Box<dyn Error>> {
         let mainnet_url = &env::var("MAINNET_URL").unwrap();
         let transport = web3::transports::Http::new(mainnet_url)?;
         let web3 = web3::Web3::new(transport);
+        let block_num = web3.eth().block_number().await?;
 
-        web3.eth().block_number().await
+        Ok(i64::try_from(block_num).unwrap())
     }
 }

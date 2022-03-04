@@ -12,7 +12,8 @@ pub struct Block {
 
 #[get("/")]
 pub fn get_not_indexed_blocks(config: State<Config>) -> Json<Block> {
-    let not_indexed_blocks = get_not_indexed_block_count(&config.api);
+    let not_indexed_blocks = get_not_indexed_block_count(&config.api)
+        .expect("Getting not indexed blocks");
     let response = Block {
         number: not_indexed_blocks
     };
@@ -21,5 +22,5 @@ pub fn get_not_indexed_blocks(config: State<Config>) -> Json<Block> {
 
 #[get("/healthcheck")]
 pub fn healthcheck(config: State<Config>, healthcheck_state: State<HealthcheckState>) {
-    graph_healthcheck(&config.api, healthcheck_state).expect("Healthcheck failed");
+    graph_healthcheck(&config.api, healthcheck_state).expect("Checking graph health");
 }
