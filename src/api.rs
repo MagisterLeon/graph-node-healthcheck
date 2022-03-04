@@ -3,7 +3,6 @@ use std::error::Error;
 
 use graphql_client::{GraphQLQuery, Response};
 use reqwest;
-use web3::types::U64;
 use async_trait::async_trait;
 
 

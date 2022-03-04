@@ -23,11 +23,3 @@ impl Error for HealthcheckError {
         &self.details
     }
 }
-
-fn raises_my_error(yes: bool) -> Result<(), HealthcheckError> {
-    if yes {
-        Err(HealthcheckError::new("borked"))
-    } else {
-        Ok(())
-    }
-}

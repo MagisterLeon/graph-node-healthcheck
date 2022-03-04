@@ -3,7 +3,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use rocket::State;
-use web3::types::U64;
 
 use crate::{current_time_as_secs, HealthcheckState};
 use crate::api::Api;
@@ -53,23 +52,13 @@ pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckStat
     }
 }
 
-pub fn get_not_indexed_block_count(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
-    let indexed_block = get_indexed_block_number(api)?;
-    let latest_block = get_latest_block_number(api)?;
-    Ok(i64::try_from(latest_block - indexed_block).unwrap())
-}
-
-fn get_indexed_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+#[tokio::main]
+pub async fn get_not_indexed_block_count(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
     let indexed_block = api.get_indexed_block_num()?;
     println!("Indexed block: {:?}", &indexed_block);
-    Ok(indexed_block)
-}
-
-#[tokio::main]
-async fn get_latest_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
     let latest_block = api.get_latest_block_num().await?;
     println!("Latest block: {:?}", &latest_block);
-    Ok(latest_block)
+    Ok(latest_block - indexed_block)
 }
 
 #[cfg(test)]
