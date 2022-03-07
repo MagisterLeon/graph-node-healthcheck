@@ -52,14 +52,25 @@ pub fn graph_healthcheck(api: &dyn Api, healthcheck_state: State<HealthcheckStat
     }
 }
 
-#[tokio::main]
-pub async fn get_not_indexed_block_count(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
-    let indexed_block = api.get_indexed_block_num()?;
-    println!("Indexed block: {:?}", &indexed_block);
-    let latest_block = api.get_latest_block_num().await?;
-    println!("Latest block: {:?}", &latest_block);
+pub fn get_not_indexed_block_count(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let indexed_block = get_indexed_block_number(api)?;
+    let latest_block = get_latest_block_number(api)?;
     Ok(latest_block - indexed_block)
 }
+
+fn get_indexed_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let indexed_block = api.get_indexed_block_num()?;
+    println!("Indexed block: {:?}", &indexed_block);
+    Ok(indexed_block)
+}
+
+#[tokio::main]
+async fn get_latest_block_number(api: &dyn Api) -> Result<i64, Box<dyn Error>> {
+    let latest_block = api.get_latest_block_num().await?;
+    println!("Latest block: {:?}", &latest_block);
+    Ok(latest_block)
+}
+
 
 #[cfg(test)]
 mod tests {
