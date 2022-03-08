@@ -3,7 +3,6 @@ use std::error::Error;
 
 use graphql_client::{GraphQLQuery, Response};
 use reqwest;
-use async_trait::async_trait;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -12,15 +11,7 @@ query_path = "src/indexed_block_query.graphql",
 response_derives = "Debug",
 )]
 pub struct IndexedBlockNumber;
-//
-// #[async_trait]
-// pub trait Api {
-//     fn get_indexed_block_num(&self) -> Result<i64, Box<dyn Error>>;
-//     fn get_latest_block_num(&self) -> Result<i64, Box<dyn Error>>;
-// }
 
-
-// #[async_trait]
 pub fn get_indexed_block_num() -> Result<i64, Box<dyn Error>> {
     let subgraph_url = &env::var("SUBGRAPH_URL").unwrap();
     let request_body = IndexedBlockNumber::build_query(indexed_block_number::Variables);
