@@ -6,20 +6,15 @@ extern crate rocket;
 use std::sync::atomic::{AtomicIsize};
 use std::sync::Mutex;
 use web3::types::RewardType::Block;
-use healthcheck::get_not_indexed_block_count;
-use api::{BlockApi};
 use time::current_time_as_secs;
-use crate::healthcheck::{get_indexed_block_number, get_latest_block_number};
+use crate::block::{get_indexed_block_number, get_latest_block_number};
 
 mod routes;
 mod healthcheck;
 mod time;
 mod api;
 mod errors;
-
-pub struct Config {
-    api: BlockApi,
-}
+mod block;
 
 pub struct HealthcheckState {
     indexed_block_num: AtomicIsize,
@@ -42,18 +37,13 @@ impl HealthcheckState {
 fn main() {
     dotenv::dotenv().ok();
 
-    let api = BlockApi {};
-
-    let indexed_block_num = get_indexed_block_number(&api)
+    let indexed_block_num = get_indexed_block_number()
         .expect("Getting indexed block number");
-    let latest_block_num = get_latest_block_number(&api)
+    let latest_block_num = get_latest_block_number()
         .expect("Getting latest block number");
     let time = current_time_as_secs();
 
     rocket::ignite()
-        .manage(Config {
-            api
-        })
         .manage(HealthcheckState::new(
             latest_block_num,
             latest_block_num,
@@ -62,7 +52,7 @@ fn main() {
         ))
         .mount("/", routes![
             routes::get_not_indexed_blocks,
-            // routes::healthcheck
+            routes::healthcheck
         ])
         .launch();
 }

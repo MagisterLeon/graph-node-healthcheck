@@ -2,8 +2,9 @@ use rocket::State;
 use rocket_contrib::json::Json;
 use serde::Serialize;
 
-use crate::healthcheck::{get_not_indexed_block_count};
-use crate::{Config, HealthcheckState};
+use crate::healthcheck::{CurrentHealthcheckState, graph_healthcheck};
+use crate::{current_time_as_secs, HealthcheckState};
+use crate::block::{get_indexed_block_number, get_latest_block_number, get_not_indexed_block_count};
 
 #[derive(Serialize)]
 pub struct Block {
@@ -11,16 +12,25 @@ pub struct Block {
 }
 
 #[get("/blocks")]
-pub fn get_not_indexed_blocks(config: State<Config>) -> Json<Block> {
-    let not_indexed_blocks = get_not_indexed_block_count(&config.api)
-        .expect("Getting not indexed blocks");
+pub fn get_not_indexed_blocks() -> Json<Block> {
+    let not_indexed_blocks = get_not_indexed_block_count()
+        .expect("Got not indexed blocks count");
     let response = Block {
         number: not_indexed_blocks
     };
     Json(response)
 }
-//
-// #[get("/health")]
-// pub fn healthcheck(config: State<Config>, healthcheck_state: State<HealthcheckState>) {
-//     graph_healthcheck(&config.api, healthcheck_state).expect("Checking graph health");
-// }
+
+#[get("/health")]
+pub fn healthcheck(previous_state: State<HealthcheckState>) {
+
+    let current_state = CurrentHealthcheckState {
+        latest_block_num: get_latest_block_number()
+            .expect("Got current latest block num"),
+        indexed_block_num: get_indexed_block_number()
+            .expect("Got current indexed block num"),
+        time: current_time_as_secs()
+    };
+
+    graph_healthcheck(previous_state).unwrap();
+}
