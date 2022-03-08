@@ -9,6 +9,7 @@ const HEALTHCHECK_INTERVAL: u64 = 5;
 // After this number of not indexed blocks we assume that the graph is down
 const HEALTHCHECK_BUFFER: i64 = 10;
 
+#[derive(Debug)]
 pub struct HealthcheckState {
     pub indexed_block_num: i64,
     pub latest_block_num: i64,
@@ -43,6 +44,9 @@ impl HealthcheckState {
 pub fn graph_healthcheck(global_state: State<GlobalHealthcheckState>) -> Health {
     let current_state = HealthcheckState::new();
     let previous_state = HealthcheckState::from_global(&global_state);
+    println!("current state: {:?}", &current_state);
+    println!("current previous_state: {:?}", &previous_state);
+
     let mut global_state_health = *global_state.health.lock().unwrap();
 
     if !healthcheck_interval_passed(current_state.time, previous_state.time) {
@@ -51,6 +55,8 @@ pub fn graph_healthcheck(global_state: State<GlobalHealthcheckState>) -> Health 
 
     let current_health = validate_state(&current_state, &previous_state);
     update_global_state(&current_state, global_state);
+    println!("previous health was: {:?}, current health is {:?}", &global_state_health, &current_health);
+
     global_state_health = current_health;
 
     return current_health;

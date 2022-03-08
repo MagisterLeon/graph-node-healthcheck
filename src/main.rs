@@ -17,7 +17,7 @@ mod time;
 mod api;
 mod block;
 
-#[derive(Copy, Clone, Serialize)]
+#[derive(Copy, Clone, Serialize, Debug)]
 pub enum Health {
     UP,
     DOWN,
