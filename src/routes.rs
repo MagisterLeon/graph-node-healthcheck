@@ -3,11 +3,10 @@ use rocket_contrib::json::Json;
 use serde::Serialize;
 
 use crate::healthcheck::{graph_healthcheck};
-use crate::{GlobalHealthcheckState, Health};
-use crate::block::{get_not_indexed_block_count};
+use crate::{ApiFacade, GlobalHealthcheckState, Health};
 
 #[derive(Serialize)]
-pub struct Block {
+pub struct NotIndexedBlocksResponse {
     number: i64,
 }
 
@@ -17,10 +16,10 @@ pub struct HealthcheckResponse {
 }
 
 #[get("/blocks")]
-pub fn get_not_indexed_blocks() -> Json<Block> {
-    let number = get_not_indexed_block_count()
+pub fn get_not_indexed_blocks() -> Json<NotIndexedBlocksResponse> {
+    let number = ApiFacade::get_not_indexed_block_count()
         .expect("Got not indexed blocks count");
-    let response = Block {
+    let response = NotIndexedBlocksResponse {
         number
     };
     Json(response)

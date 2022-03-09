@@ -1,63 +1,32 @@
 use std::sync::atomic::Ordering;
-
 use rocket::State;
 
-use crate::{current_time_as_secs, get_indexed_block_number, get_latest_block_number, GlobalHealthcheckState, Health};
+use crate::{GlobalHealthcheckState, Health};
+use crate::state::HealthcheckState;
 
 const HEALTHCHECK_INTERVAL: u64 = 5;
 
 // After this number of not indexed blocks we assume that the graph is down
 const HEALTHCHECK_BUFFER: i64 = 10;
 
-#[derive(Debug)]
-pub struct HealthcheckState {
-    pub indexed_block_num: i64,
-    pub latest_block_num: i64,
-    pub time: u64,
-}
-
-impl HealthcheckState {
-    pub fn new() -> Self {
-        Self {
-            indexed_block_num: get_indexed_block_number().expect("Got current indexed block num"),
-            latest_block_num: get_latest_block_number().expect("Got current latest block num"),
-            time: current_time_as_secs(),
-        }
-    }
-    pub fn from(indexed_block_num: i64, latest_block_num: i64) -> Self {
-        Self {
-            indexed_block_num,
-            latest_block_num,
-            time: current_time_as_secs(),
-        }
-    }
-
-    pub fn from_global(global_state: &State<GlobalHealthcheckState>) -> Self {
-        Self {
-            indexed_block_num: global_state.indexed_block_num.load(Ordering::Relaxed) as i64,
-            latest_block_num: global_state.latest_block_num.load(Ordering::Relaxed) as i64,
-            time: global_state.time.load(Ordering::Relaxed) as u64,
-        }
-    }
-}
-
 pub fn graph_healthcheck(global_state: State<GlobalHealthcheckState>) -> Health {
     let current_state = HealthcheckState::new();
     let previous_state = HealthcheckState::from_global(&global_state);
-    println!("current state: {:?}", &current_state);
-    println!("current previous_state: {:?}", &previous_state);
+    println!("Current state: {:?}", &current_state);
+    println!("Current previous_state: {:?}", &previous_state);
 
-    let mut global_state_health = *global_state.health.lock().unwrap();
+    let mut global_state_health = global_state.health.lock().unwrap();
 
     if !healthcheck_interval_passed(current_state.time, previous_state.time) {
-        return global_state_health;
+        println!("Healthcheck interval hasn't passed yet, returning former value: {:?}", &global_state_health);
+        return *global_state_health;
     }
 
     let current_health = validate_state(&current_state, &previous_state);
-    update_global_state(&current_state, global_state);
+    update_global_state(&current_state, &global_state);
     println!("previous health was: {:?}, current health is {:?}", &global_state_health, &current_health);
 
-    global_state_health = current_health;
+    *global_state_health = current_health;
 
     return current_health;
 }
@@ -78,16 +47,16 @@ fn validate_state(current_state: &HealthcheckState, previous_state: &Healthcheck
     };
 }
 
-fn update_global_state(current_state: &HealthcheckState, global_state: State<GlobalHealthcheckState>) {
+fn update_global_state(current_state: &HealthcheckState, global_state: &State<GlobalHealthcheckState>) {
     global_state.indexed_block_num.store(current_state.indexed_block_num as isize, Ordering::Relaxed);
     global_state.latest_block_num.store(current_state.latest_block_num as isize, Ordering::Relaxed);
     global_state.time.store(current_state.time as isize, Ordering::Relaxed);
 }
 
-//
 #[cfg(test)]
 mod tests {
     use crate::Health;
+    use crate::{current_time_as_secs};
     use super::*;
 
     #[test]
